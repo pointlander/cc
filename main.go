@@ -435,8 +435,9 @@ func main() {
 	Mul := context.B(context.Mul)
 	Dropout := context.U(context.Dropout)
 	Quadratic := context.B(context.Quadratic)
-	T := context.U(context.T)
+	//T := context.U(context.T)
 	Avg := context.U(context.Avg)
+	Euclidean := context.B(Euclidean)
 
 	drop := .1
 	dropout := map[string]interface{}{
@@ -444,8 +445,8 @@ func main() {
 		"drop": &drop,
 	}
 
-	loss := Avg(Quadratic(Mul(Dropout(Square(set.Get("a")), dropout), T(set.Get("b"))),
-		/*Mul(Dropout(Square(*/ T(set.Get("b")) /*), dropout)*/ /*, T(set.Get("a")))*/))
+	loss := Avg(Quadratic(Mul(Dropout(Square(set.Get("a")), dropout), Euclidean(set.Get("b"), set.Get("b"))), /*T(set.Get("b")))*/
+		/*Mul(Dropout(Square(*/ /*T(set.Get("b"))*/ Euclidean(set.Get("b"), set.Get("b")) /*), dropout)*/ /*, T(set.Get("a")))*/))
 
 	for iteration := range 1024 {
 		set.Zero()
