@@ -438,7 +438,7 @@ func main() {
 	T := context.U(context.T)
 	Avg := context.U(context.Avg)
 
-	drop := .3
+	drop := .1
 	dropout := map[string]interface{}{
 		"rng":  rng,
 		"drop": &drop,
