@@ -350,7 +350,7 @@ func main() {
 		}
 	}
 	var b []float64
-	{
+	/*{
 		context := gradient.Context[float64]{}
 		set := context.NewSet()
 		set.Add("w0", width, 4)
@@ -403,12 +403,27 @@ func main() {
 			return true
 		})
 
+	}*/
+	{
+		for i := range secom {
+			for ii := range secom[i] {
+				f, err := strconv.ParseFloat(secom[i][ii], 64)
+				if err != nil {
+					panic(err)
+				}
+				if math.IsNaN(f) {
+					f = 0
+				}
+				b = append(b, f*.001)
+			}
+		}
 	}
+
 	rng := rand.New(rand.NewSource(1))
 	context := gradient.Context[float64]{}
 	set := context.NewSet()
-	set.Add("a", 4, length)
-	set.AddData("b", 4, length)
+	set.Add("a", 3, length)
+	set.AddData("b", width, length)
 	set.InitAdam(rng)
 	for i, value := range b {
 		set.ByName["b"].X[i] = value
@@ -430,7 +445,7 @@ func main() {
 	}
 
 	loss := Avg(Quadratic(Mul(Dropout(Square(set.Get("a")), dropout), T(set.Get("b"))),
-		Mul(Dropout(Square(set.Get("b")), dropout), T(set.Get("a")))))
+		/*Mul(Dropout(Square(*/ T(set.Get("b")) /*), dropout)*/ /*, T(set.Get("a")))*/))
 
 	for iteration := range 1024 {
 		set.Zero()
@@ -484,6 +499,36 @@ func main() {
 			}
 		}
 		clusters := a.ClusterKMeansPlusPlusMeta(1, 2, 100, 100)
+		if clusters == nil {
+			panic("clustering failed")
+		}
+		aa := make(map[string][2]int)
+		for i := range label {
+			histogram := aa[label[i][0]]
+			histogram[clusters[i]]++
+			aa[label[i][0]] = histogram
+		}
+		fmt.Println()
+		for k, v := range aa {
+			fmt.Println(k, v)
+		}
+	}
+
+	{
+		a := gradient.NewV[float64](width, length)
+		for i := range secom {
+			for ii := range secom[i] {
+				f, err := strconv.ParseFloat(secom[i][ii], 64)
+				if err != nil {
+					panic(err)
+				}
+				if math.IsNaN(f) {
+					f = 0
+				}
+				a.X = append(a.X, f)
+			}
+		}
+		clusters, _ := ClusterPageRank(a, 2)
 		if clusters == nil {
 			panic("clustering failed")
 		}
