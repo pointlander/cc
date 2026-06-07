@@ -3,7 +3,7 @@ module github.com/pointlander/cc
 go 1.25.0
 
 require (
-	github.com/pointlander/gradient v0.0.0-20260606135217-85bebccb00f1
+	github.com/pointlander/gradient v0.0.0-20260607192209-943c0daaf932
 	gonum.org/v1/plot v0.17.0
 )
 

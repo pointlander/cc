@@ -27,49 +27,6 @@ import (
 //go:embed bcwd.zip
 var Data embed.FS
 
-// dropout is a dropout regularization function
-func dropout[T gradient.Number](a *gradient.V[T], drop float64, drops []int) *gradient.V[T] {
-	size, width := len(a.X), a.S[0]
-	c, factor := gradient.NewV[T](a.S...), gradient.Convert[T](1.0/(1.0-drop))
-	c.X = c.X[:cap(c.X)]
-	for i := 0; i < size; i += width {
-		for j, ax := range a.X[i : i+width] {
-			if drops[i+j] == 1 {
-				c.X[i+j] = ax * factor
-			}
-		}
-	}
-	return c
-}
-
-// Dropout is a dropout regularization function
-func Dropout[T gradient.Number](k gradient.Continuation[T], node int, a *gradient.V[T], options ...map[string]interface{}) bool {
-	size, width := len(a.X), a.S[0]
-	rng := options[0]["rng"].(*rand.Rand)
-	drop := .1
-	if options[0]["drop"] != nil {
-		drop = *options[0]["drop"].(*float64)
-	}
-	drops := make([]int, size)
-	for i := range drops {
-		if rng.Float64() > drop {
-			drops[i] = 1
-		}
-	}
-	c := dropout(a, drop, drops)
-	if k(c) {
-		return true
-	}
-	for i := 0; i < size; i += width {
-		for j := range a.D[i : i+width] {
-			if drops[i+j] == 1 {
-				a.D[i+j] += c.D[i+j]
-			}
-		}
-	}
-	return false
-}
-
 func main() {
 	file, err := Data.Open("bcwd.zip")
 	if err != nil {
@@ -117,114 +74,7 @@ func main() {
 	fmt.Println(counta, countb)
 	length := len(secom)
 	width := len(secom[0])
-	{
-		x := gradient.NewV[float64](width, length)
-		for i := range length {
-			for ii := range width {
-				f, err := strconv.ParseFloat(secom[i][ii], 64)
-				if err != nil {
-					panic(err)
-				}
-				if math.IsNaN(f) {
-					f = 0
-				}
-				x.X = append(x.X, f)
-			}
-		}
-		clusters := x.ClusterKMeansPlusPlus(1, 2, 50)
-		aa := make(map[string][2]int)
-		for i := range clusters {
-			histogram := aa[label[i][0]]
-			histogram[clusters[i]]++
-			aa[label[i][0]] = histogram
-		}
-		fmt.Println()
-		for k, v := range aa {
-			fmt.Println(k, v)
-		}
-	}
-	fmt.Println()
-	{
-		x := gradient.NewV[float64](width, length)
-		for i := range length {
-			for ii := range width {
-				f, err := strconv.ParseFloat(secom[i][ii], 64)
-				if err != nil {
-					panic(err)
-				}
-				if math.IsNaN(f) {
-					f = 0
-				}
-				x.X = append(x.X, f)
-			}
-		}
-		clusters, _ := x.ClusterPageRank(2)
-		aa := make(map[string][2]int)
-		for i := range clusters {
-			histogram := aa[label[i][0]]
-			histogram[clusters[i]]++
-			aa[label[i][0]] = histogram
-		}
-		fmt.Println()
-		for k, v := range aa {
-			fmt.Println(k, v)
-		}
-	}
 	var b []float64
-	/*{
-		context := gradient.Context[float64]{}
-		set := context.NewSet()
-		set.Add("w0", width, 4)
-		set.AddBias("b0", 4)
-		set.Add("w1", 8, width)
-		set.AddBias("b1", width)
-		set.AddData("input", width, length)
-		rng := rand.New(rand.NewSource(1))
-		set.InitAdam(rng)
-		input, index := set.ByName["input"], 0
-		for i := range secom {
-			sum := 0.0
-			start := index
-			for ii := range secom[i] {
-				f, err := strconv.ParseFloat(secom[i][ii], 64)
-				if err != nil {
-					panic(err)
-				}
-				if math.IsNaN(f) {
-					f = 0
-				}
-				input.X[index] = f
-				sum += f
-				index++
-			}
-			for range width {
-				input.X[start] /= sum
-				start++
-			}
-		}
-		Mul := context.B(context.Mul)
-		Add := context.B(context.Add)
-		Everett := context.U(context.Everett)
-		Quadratic := context.B(context.Quadratic)
-		Avg := context.U(context.Avg)
-		l0 := Everett(Add(Mul(set.Get("w0"), set.Get("input")), set.Get("b0")))
-		l1 := Add(Mul(set.Get("w1"), l0), set.Get("b1"))
-		loss := Avg(Quadratic(set.Get("input"), l1))
-
-		for iteration := range 1024 {
-			set.Zero()
-			l := gradient.Gradient(loss).X[0]
-			fmt.Println(iteration, l)
-			set.Adam(gradient.B1, gradient.B2, .05)
-		}
-
-		l0 = Add(Mul(set.Get("w0"), set.Get("input")), set.Get("b0"))
-		l0(func(a *gradient.V[float64]) bool {
-			b = a.X
-			return true
-		})
-
-	}*/
 	{
 		for i := range secom {
 			for ii := range secom[i] {
@@ -254,7 +104,7 @@ func main() {
 	//Euclidean := context.B(Euclidean)
 	Square := context.U(context.Square)
 	Mul := context.B(context.Mul)
-	Dropout := context.U(Dropout)
+	Dropout := context.U(context.DropoutMatrix)
 	Quadratic := context.B(context.Quadratic)
 	//T := context.U(context.T)
 	Avg := context.U(context.Avg)
@@ -278,8 +128,9 @@ func main() {
 
 	a := set.ByName["a"].X
 
+	labels := []string{"B", "M"}
 	{
-		fmt.Println()
+		fmt.Println("Sort with Meta KMeans")
 		clusters := set.ByName["a"].ClusterKMeansPlusPlusMeta(5, 2, 100, 100)
 		aa := make(map[string][2]int)
 		for i := range label {
@@ -287,13 +138,13 @@ func main() {
 			histogram[clusters[i]]++
 			aa[label[i][0]] = histogram
 		}
-		for k, v := range aa {
-			fmt.Println(k, v)
+		for _, v := range labels {
+			fmt.Println(v, aa[v])
 		}
 	}
 
 	{
-		fmt.Println()
+		fmt.Println("Sort with Page Rank")
 		clusters, _ := set.ByName["a"].ClusterPageRank(2)
 		aa := make(map[string][2]int)
 		for i := range label {
@@ -301,8 +152,8 @@ func main() {
 			histogram[clusters[i]]++
 			aa[label[i][0]] = histogram
 		}
-		for k, v := range aa {
-			fmt.Println(k, v)
+		for _, v := range labels {
+			fmt.Println(v, aa[v])
 		}
 	}
 
@@ -330,9 +181,9 @@ func main() {
 			histogram[clusters[i]]++
 			aa[label[i][0]] = histogram
 		}
-		fmt.Println()
-		for k, v := range aa {
-			fmt.Println(k, v)
+		fmt.Println("Meta KMeans")
+		for _, v := range labels {
+			fmt.Println(v, aa[v])
 		}
 	}
 
@@ -360,9 +211,9 @@ func main() {
 			histogram[clusters[i]]++
 			aa[label[i][0]] = histogram
 		}
-		fmt.Println()
-		for k, v := range aa {
-			fmt.Println(k, v)
+		fmt.Println("Page Rank")
+		for _, v := range labels {
+			fmt.Println(v, aa[v])
 		}
 	}
 
