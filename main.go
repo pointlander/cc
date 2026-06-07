@@ -27,6 +27,49 @@ import (
 //go:embed bcwd.zip
 var Data embed.FS
 
+// dropout is a dropout regularization function
+func dropout[T gradient.Number](a *gradient.V[T], drop float64, drops []int) *gradient.V[T] {
+	size, width := len(a.X), a.S[0]
+	c, factor := gradient.NewV[T](a.S...), gradient.Convert[T](1.0/(1.0-drop))
+	c.X = c.X[:cap(c.X)]
+	for i := 0; i < size; i += width {
+		for j, ax := range a.X[i : i+width] {
+			if drops[i+j] == 1 {
+				c.X[i+j] = ax * factor
+			}
+		}
+	}
+	return c
+}
+
+// Dropout is a dropout regularization function
+func Dropout[T gradient.Number](k gradient.Continuation[T], node int, a *gradient.V[T], options ...map[string]interface{}) bool {
+	size, width := len(a.X), a.S[0]
+	rng := options[0]["rng"].(*rand.Rand)
+	drop := .1
+	if options[0]["drop"] != nil {
+		drop = *options[0]["drop"].(*float64)
+	}
+	drops := make([]int, size)
+	for i := range drops {
+		if rng.Float64() > drop {
+			drops[i] = 1
+		}
+	}
+	c := dropout(a, drop, drops)
+	if k(c) {
+		return true
+	}
+	for i := 0; i < size; i += width {
+		for j := range a.D[i : i+width] {
+			if drops[i+j] == 1 {
+				a.D[i+j] += c.D[i+j]
+			}
+		}
+	}
+	return false
+}
+
 func main() {
 	file, err := Data.Open("bcwd.zip")
 	if err != nil {
@@ -211,7 +254,7 @@ func main() {
 	//Euclidean := context.B(Euclidean)
 	Square := context.U(context.Square)
 	Mul := context.B(context.Mul)
-	Dropout := context.U(context.Dropout)
+	Dropout := context.U(Dropout)
 	Quadratic := context.B(context.Quadratic)
 	//T := context.U(context.T)
 	Avg := context.U(context.Avg)
