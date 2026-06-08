@@ -1,3 +1,10 @@
+# NN model
+'a' is the embedding space, and 'b' is the input data.
+```go
+loss := Avg(Quadratic(Mul(Dropout(Square(set.Get("a")), dropout), Euclidean(set.Get("b"), set.Get("b"))),
+	Euclidean(set.Get("b"), set.Get("b"))))
+```
+
 # Results for clustering the breast cancer wisconsin diagnostic
 ```
 Sort with nn and cluster with Meta KMeans
